@@ -1,50 +1,107 @@
-patches-own [state] ; Initialiseer state, hoevaak is de ant over een patch gegaan
-globals [ colours ... ] ; Initialiseer de color variabele
+extensions [ table ]
+
+patches-own [ state state-sequence ] ; Initialiseer state en state-sequence.
+ants-own [ bumped? ] ; Initialiseer bumped?.
+globals [ colours instruction-table N ... ] ; Initialiseer de colours, de instruction table en de N variabele.
 
 breed [ants ant]
 to setup
  clear-all
- set colours [ white red lime cyan yellow 126 3 brown 52 blue 43 124 ] ; Vul de colours lijst
- ;set-default-shape ants “bug”
- create-ants 1
- [
-   set color red
-   set size 15
+ set colours [ white red lime cyan yellow 126 3 brown 52 blue 43 124 ] ; Vul de colours lijst.
+ set instruction-table table:from-list [ ; Vul de instruction table.
+    ["Langton's ant" "RL"]
+    ["Still chaos after 1.000.000 steps" "RLR"]
+    ["Immediately a simple highway" "LLR"]
+    ["A straight highway to the right" "RRLLLRRRLRRR"]
+    ["A broad highway, 45 degrees" "RRLRLLRLRR"]
+    ["568.000 steps before highway emerges" "LLLLLLRRLRRR"]
+    ["A highway that is not a multiple of 45 degrees" "RLRLRLLRLR"]
+    ["A curvy highway to the left" "LLRRRLRLRLLR"]
+    ["Some way to fill a sector" "RRLRLRR"]
+    ["Some other way to fill a sector" "RRLLLRLLLRRR"]
+    ["White upper cone filler" "RRLLLRRRRRLR"]
+    ["Left lower plane filler" "RRLRLLRRRRRR"]
+    ["Some way to fill the whole plane" "RRLRR"]
+    ["Fill the whole plane, connect with highways" "LRRRRRLLR"]
+    ["Fill the whole plane, with spiraling highway" "LRRRRLLLRRR"]
+    ["Your brain (from above)" "LLRR"]
+    ["Your brain (from above), connected to an IC" "RLLR"]
+    ["Professor's brain (from above)" "LLLLLLRRRRRR"]
+    ["Professor's brain connected to an IC" "RRRLLLLLLRRR"]
+    ["Complicated construction" "RRRRLRRRLLRR"]
+    ["Biffled highway" "RLLLLRRRLLLR"]
+    ["Overheating reactor" "RRLRLLLRRRR"]
+    ["Extending square domain" "LLRLLLRRRRR"]
+    ["Persian carpet" "LRLRLLLLLLLR"]
+    ["Other carpet (skew)" "LLRRLRRRRRRR"]
+ ]
+
+ create-ants 1 [ ; Maak de ant met de juiste startwaarden
+   set shape "bug"
+   set color black
+   set size 3
    set heading 0
+   set bumped? false
  ]
- ask patches
- [
-   set state 0 set pcolor gray ; Geef alle patches state 0 en maak ze grijs
+ ask patches [
+    set state 0 set pcolor gray ; Geef alle patches state 0 en maak ze grijs.
+    ; Kijk of er een eigen input is met alleen R of L en met lengte 2 < x < 12, anders de table input gebruiken.
+    ifelse (remove "L" remove "R" My-sequence-choice = "" and 2 <= length My-sequence-choice and length My-sequence-choice <= 12) [
+      set state-sequence My-sequence-choice
+    ][
+      set state-sequence table:get instruction-table Sequence-choice ; Geef alle patches de gekozen table state-sequence.
+    ]
+    set N length state-sequence ; Set the N op de lengte van de state-sequence.
  ]
+ reset-ticks
 end
 
 to go
- ifelse ( (pxcor = min-pxcor or pxcor = max-pxcor) and (pycor = min-pycor or pycor = max-pycor) ) ; Als de ant op de rand is stop dan
- [stop]
- [
-   ifelse ([state] of patch-here <= N) ; Als de state van de patch <= dan N, tel er een bij op, anders: begin bij 0
-   [set state state + 1]
-   [set state 0]
-
-   forward 1
-   ifelse (pcolor = gray)
-   [
-     set pcolor item state colours ; Geef de patch de kleur v/d huidige state
-     left 90
-   ]
-   [
-     set pcolor gray
-     right 90
-   ]
- ]
+  if any? ants with [bumped?] [stop] ; Als een ant geen stap meer vooruit kon, stop de function go.
+  ask ants [
+    move
+    direction
+    update-patch
+  ]
+  tick
 end
 
+to move ; Kijk of de ant een stap vooruit kan, anders set bumped? true.
+  carefully [
+    move-to patch-ahead 1
+  ] [
+    set bumped? true
+  ]
+end
+
+to direction ; Bepaal de richting aan de hand van de huidige kleur.
+  ifelse (item state state-sequence = "L")[
+    left Left-turn-angle
+  ][
+    right Right-turn-angle
+  ]
+end
+
+to update-patch ; Geef de patch de nieuwe state waarde, t.o.v. mod N en geef de patch de kleur v/d nieuwe state
+  set state (state + 1) mod N
+  set pcolor item state colours
+end
+
+to random-seq ; Genereer een random sequence van L's en R's en set my sequence choice to deze sequence.
+  let random-length 2 + random 10
+  let random-sequence to-string n-values random-length [ one-of ["L" "R"] ]
+  set My-sequence-choice random-sequence
+end
+
+to-report to-string [ l ]  ; Geef de list als string terug.
+  report reduce [ [?1 ?2] -> word ?1 ?2 ] l
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
-10
-780
-581
+340
+20
+910
+591
 -1
 -1
 2.0
@@ -68,9 +125,9 @@ ticks
 30.0
 
 BUTTON
-4
+105
 20
-67
+168
 53
 Setup
 Setup
@@ -85,33 +142,86 @@ NIL
 1
 
 BUTTON
-4
+176
+20
+239
 53
-67
-86
 Go
 go
 T
 1
 T
-TURTLE
+OBSERVER
 NIL
 G
 NIL
 NIL
 1
 
-SLIDER
-71
-21
-205
-54
-N
-N
-2
-12
-7.0
+CHOOSER
+5
+60
+332
+105
+Sequence-choice
+Sequence-choice
+"Langton's ant" "Still chaos after 1.000.000 steps" "Immediately a simple highway" "A straight highway to the right" "A broad highway, 45 degrees" "568.000 steps before highway emerges" "A highway that is not a multiple of 45 degrees" "A curvy highway to the left" "Some way to fill a sector" "Some other way to fill a sector" "White upper cone filler" "Left lower plane filler" "Some way to fill the whole plane" "Fill the whole plane, connect with highways" "Fill the whole plane, with spiraling highway" "Your brain (from above)" "Your brain (from above), connected to an IC" "Professor's brain (from above)" "Professor's brain connected to an IC" "Complicated construction" "Biffled highway" "Overheating reactor" "Extending square domain" "Persian carpet" "Other carpet (skew)"
+6
+
+INPUTBOX
+5
+110
+210
+170
+My-sequence-choice
+NIL
 1
+0
+String
+
+BUTTON
+215
+110
+330
+170
+Random sequence
+random-seq
+NIL
+1
+T
+OBSERVER
+NIL
+R
+NIL
+NIL
+1
+
+SLIDER
+5
+175
+165
+208
+Left-turn-angle
+Left-turn-angle
+0
+360
+90.0
+45
+1
+NIL
+HORIZONTAL
+
+SLIDER
+170
+175
+330
+208
+Right-turn-angle
+Right-turn-angle
+0
+360
+90.0
+45
 1
 NIL
 HORIZONTAL
@@ -119,39 +229,25 @@ HORIZONTAL
 @#$#@#$#@
 ## WHAT IS IT?
 
-Langton's ant. A Cellular Automaton
+This is a Langton's ant (A Cellular Automaton) simulator, where the standard Langton's ant can be used, but also different configurations of Langton's ant.
 
-## HOW IT WORKS
+## INPUTS
 
-(what rules the agents use to create the overall behavior of the model)
+There are 3 different types of input. 
+1. First of all there is a list of predefined configurations, which can be selected by the user. 
+2. Secondly there is an input section, where the user can give it's own configuration and length of langton's ant module. It can be 2 to 12 characters long and should consist of R and L (Telling which way the ant has to turn on which state).
+3. Thirth option is to randomly create a configuration, which is also 2 to 12 characters long.
+4. Last two option are to determine the angle the ant turns on the left and right move, between 0 to 360 degrees.
 
-## HOW TO USE IT
+## WARNING
 
-(how to use the model, including a description of each of the items in the Interface tab)
-
-## THINGS TO NOTICE
-
-(suggested things for the user to notice while running the model)
-
-## THINGS TO TRY
-
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
-
-## EXTENDING THE MODEL
-
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
-
-## NETLOGO FEATURES
-
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
-
-## RELATED MODELS
-
-(models in the NetLogo Models Library and elsewhere which are of related interest)
+If you want to selcect a predefined configuration, you have to make sure that the input table is empty, because otherwise it will not work.
 
 ## CREDITS AND REFERENCES
 
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+This script is created by,
+Bram Kreuger | 5990653
+Floris van Voorst tot Voorst | 5990076
 @#$#@#$#@
 default
 true
@@ -458,7 +554,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -475,5 +571,5 @@ true
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
 @#$#@#$#@
-0
+1
 @#$#@#$#@
