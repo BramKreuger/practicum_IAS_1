@@ -53,7 +53,26 @@ to setup
     ]
     set N length state-sequence ; Set the N op de lengte van de state-sequence.
  ]
+ starting-values
  reset-ticks
+end
+
+to starting-values ; Geef patches binnen de radius een state/kleur op basis van de density kans
+  if radius > 0 and density > 0
+  [
+    ask patch 0 0
+    [
+      random-seed new-seed
+      ask patches in-radius radius
+      [
+        if random 100 < (density * 100)
+        [
+          set state (random N) mod N
+          set pcolor item state colours
+        ]
+      ]
+    ]
+  ]
 end
 
 to go
@@ -118,8 +137,8 @@ GRAPHICS-WINDOW
 140
 -140
 140
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -166,7 +185,7 @@ CHOOSER
 Sequence-choice
 Sequence-choice
 "Langton's ant" "Still chaos after 1.000.000 steps" "Immediately a simple highway" "A straight highway to the right" "A broad highway, 45 degrees" "568.000 steps before highway emerges" "A highway that is not a multiple of 45 degrees" "A curvy highway to the left" "Some way to fill a sector" "Some other way to fill a sector" "White upper cone filler" "Left lower plane filler" "Some way to fill the whole plane" "Fill the whole plane, connect with highways" "Fill the whole plane, with spiraling highway" "Your brain (from above)" "Your brain (from above), connected to an IC" "Professor's brain (from above)" "Professor's brain connected to an IC" "Complicated construction" "Biffled highway" "Overheating reactor" "Extending square domain" "Persian carpet" "Other carpet (skew)"
-6
+23
 
 INPUTBOX
 5
@@ -222,6 +241,36 @@ Right-turn-angle
 360
 90.0
 45
+1
+NIL
+HORIZONTAL
+
+SLIDER
+5
+215
+165
+248
+Radius
+Radius
+0
+140
+85.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+5
+255
+165
+288
+Density
+Density
+0
+1
+0.67
+0.01
 1
 NIL
 HORIZONTAL
@@ -554,7 +603,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.1
+NetLogo 6.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
