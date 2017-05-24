@@ -1,6 +1,6 @@
 extensions [ table ]
 
-patches-own [ state state-sequence ] ; Initialiseer state en state-sequence.
+patches-own [ state state-sequence visits ] ; Initialiseer state, state-sequence visits.
 ants-own [ bumped? ] ; Initialiseer bumped?.
 globals [ colours instruction-table N ... ] ; Initialiseer de colours, de instruction table en de N variabele.
 
@@ -44,7 +44,7 @@ to setup
    set bumped? false
  ]
  ask patches [
-    set state 0 set pcolor gray ; Geef alle patches state 0 en maak ze grijs.
+    set state 0 set visits 0 set pcolor gray ; Geef alle patches state 0, visits 0 en maak ze grijs.
     ; Kijk of er een eigen input is met alleen R of L en met lengte 2 < x < 12, anders de table input gebruiken.
     ifelse (remove "L" remove "R" My-sequence-choice = "" and 2 <= length My-sequence-choice and length My-sequence-choice <= 12) [
       set state-sequence My-sequence-choice
@@ -62,12 +62,12 @@ to starting-values ; Geef patches binnen de radius een state/kleur op basis van 
   [
     ask patch 0 0
     [
-      random-seed new-seed
       ask patches in-radius radius
       [
-        if random 100 < (density * 100)
+        let random-state random 100
+        if random-state < (density * 100)
         [
-          set state (random N) mod N
+          set state ( random-state ) mod N
           set pcolor item state colours
         ]
       ]
@@ -76,13 +76,15 @@ to starting-values ; Geef patches binnen de radius een state/kleur op basis van 
 end
 
 to go
-  if any? ants with [bumped?] [stop] ; Als een ant geen stap meer vooruit kon, stop de function go.
-  ask ants [
-    move
-    direction
-    update-patch
+  if any? ants with [bumped?] [ stop ] ; Als een ant geen stap meer vooruit kon, stop de function go en voer heatmap uit.
+  foreach sort-on [who] ants [ ; Make sure that if there are more ants, they are asked in order to move.
+    the-ant -> ask the-ant [
+      move
+      direction
+      update-patch
+    ]
   ]
-  tick
+  tick ; Tick na elke 'move' van een ant.
 end
 
 to move ; Kijk of de ant een stap vooruit kan, anders set bumped? true.
@@ -94,9 +96,10 @@ to move ; Kijk of de ant een stap vooruit kan, anders set bumped? true.
 end
 
 to direction ; Bepaal de richting aan de hand van de huidige kleur.
-  ifelse (item state state-sequence = "L")[
+  if(item state state-sequence = "L")[
     left Left-turn-angle
-  ][
+  ]
+  if(item state state-sequence = "R")[
     right Right-turn-angle
   ]
 end
@@ -104,6 +107,19 @@ end
 to update-patch ; Geef de patch de nieuwe state waarde, t.o.v. mod N en geef de patch de kleur v/d nieuwe state
   set state (state + 1) mod N
   set pcolor item state colours
+  set visits visits + 1
+end
+
+to heatmap ; Check voor alle patches hoeveel 'visits' ze hebben en bepaal de kleuren van de patches daarop. (Alleen als de app afgelopen is)
+  if any? ants with [bumped?] [
+    ask patches [
+      ifelse (visits = 0) [
+        set pcolor sky
+      ] [
+        set pcolor scale-color red visits 0 (17 * N)
+      ]
+    ]
+  ]
 end
 
 to random-seq ; Genereer een random sequence van L's en R's en set my sequence choice to deze sequence.
@@ -137,16 +153,16 @@ GRAPHICS-WINDOW
 140
 -140
 140
-1
-1
+0
+0
 1
 ticks
 30.0
 
 BUTTON
-105
+65
 20
-168
+128
 53
 Setup
 Setup
@@ -161,9 +177,9 @@ NIL
 1
 
 BUTTON
-176
+136
 20
-239
+199
 53
 Go
 go
@@ -185,7 +201,7 @@ CHOOSER
 Sequence-choice
 Sequence-choice
 "Langton's ant" "Still chaos after 1.000.000 steps" "Immediately a simple highway" "A straight highway to the right" "A broad highway, 45 degrees" "568.000 steps before highway emerges" "A highway that is not a multiple of 45 degrees" "A curvy highway to the left" "Some way to fill a sector" "Some other way to fill a sector" "White upper cone filler" "Left lower plane filler" "Some way to fill the whole plane" "Fill the whole plane, connect with highways" "Fill the whole plane, with spiraling highway" "Your brain (from above)" "Your brain (from above), connected to an IC" "Professor's brain (from above)" "Professor's brain connected to an IC" "Complicated construction" "Biffled highway" "Overheating reactor" "Extending square domain" "Persian carpet" "Other carpet (skew)"
-23
+1
 
 INPUTBOX
 5
@@ -254,39 +270,64 @@ Radius
 Radius
 0
 140
-85.0
+0.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-5
-255
-165
-288
+170
+215
+330
+248
 Density
 Density
 0
 1
-0.67
+0.0
 0.01
 1
 NIL
 HORIZONTAL
+
+BUTTON
+205
+20
+287
+53
+Heatmap
+heatmap
+NIL
+1
+T
+OBSERVER
+NIL
+H
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
 
 This is a Langton's ant (A Cellular Automaton) simulator, where the standard Langton's ant can be used, but also different configurations of Langton's ant.
 
+## BUTTONS
+
+There are 3 different buttons on top.
+1. Setup   -> this button will configure all the changes you made and setup the model.
+2. Go      -> this button wil initialize go function, which starts the model.
+3. Heatmap -> this button will show how many times patches have been visted after a configuration. (Sky is never, others range from a lot white via red to almost none black).
+
 ## INPUTS
 
-There are 3 different types of input. 
+There are 7 different types of input. 
 1. First of all there is a list of predefined configurations, which can be selected by the user. 
 2. Secondly there is an input section, where the user can give it's own configuration and length of langton's ant module. It can be 2 to 12 characters long and should consist of R and L (Telling which way the ant has to turn on which state).
 3. Thirth option is to randomly create a configuration, which is also 2 to 12 characters long.
-4. Last two option are to determine the angle the ant turns on the left and right move, between 0 to 360 degrees.
+4. Fourth an fifth options are to determine the angle the ant turns on the left and right move, between 0 to 360 degrees.
+5. Sixth and seventh options are to determine if you want cells in a radius around (0,0) to potentionally have a start value, and the density of the radius created.
 
 ## WARNING
 
@@ -603,7 +644,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
