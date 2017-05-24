@@ -1,7 +1,7 @@
 extensions [ table ]
 
 patches-own [ state state-sequence visits ] ; Initialiseer state, state-sequence visits.
-ants-own [ bumped? ] ; Initialiseer bumped?.
+ants-own [ bumped? start? steps] ; Initialiseer bumped? en steps.
 globals [ colours instruction-table N ... ] ; Initialiseer de colours, de instruction table en de N variabele.
 
 breed [ants ant]
@@ -42,6 +42,7 @@ to setup
    set size 3
    set heading 0
    set bumped? false
+   set start? false
  ]
  ask patches [
     set state 0 set visits 0 set pcolor gray ; Geef alle patches state 0, visits 0 en maak ze grijs.
@@ -76,38 +77,76 @@ to starting-values ; Geef patches binnen de radius een state/kleur op basis van 
 end
 
 to go
-  if any? ants with [bumped?] [ stop ] ; Als een ant geen stap meer vooruit kon, stop de function go en voer heatmap uit.
+  if any? ants with [bumped?] [ stop ] ; Als een ant geen stap meer vooruit kon, stop de function go.
   foreach sort-on [who] ants [ ; Make sure that if there are more ants, they are asked in order to move.
-    the-ant -> ask the-ant [
-      move
-      direction
-      update-patch
+    [the-ant] -> ask the-ant [
+      ifelse (Reverse-walk = false) [
+        move
+        direction
+        update-patch
+      ] [
+        update-patch
+        direction
+        move
+      ]
     ]
   ]
   tick ; Tick na elke 'move' van een ant.
 end
 
 to move ; Kijk of de ant een stap vooruit kan, anders set bumped? true.
-  carefully [
-    move-to patch-ahead 1
+  ifelse (Reverse-walk = false) [
+    carefully [
+      move-to patch-ahead 1
+      set steps steps + 1
+    ] [
+      set bumped? true
+    ]
   ] [
-    set bumped? true
+    ifelse (steps > 1) [
+      back 1
+      set steps steps - 1
+    ] [
+      if (start? = false) [
+        back 1
+        set heading 0
+        set start? true
+      ]
+    ]
   ]
 end
 
 to direction ; Bepaal de richting aan de hand van de huidige kleur.
-  if(item state state-sequence = "L")[
-    left Left-turn-angle
-  ]
-  if(item state state-sequence = "R")[
-    right Right-turn-angle
+  ifelse (Reverse-walk = false) [
+    if(item state state-sequence = "L")[
+      left Left-turn-angle
+    ]
+    if(item state state-sequence = "R")[
+      right Right-turn-angle
+    ]
+  ] [
+    if(item (state) state-sequence = "L")[
+      right Left-turn-angle
+    ]
+    if(item (state) state-sequence = "R")[
+      left Right-turn-angle
+    ]
   ]
 end
 
 to update-patch ; Geef de patch de nieuwe state waarde, t.o.v. mod N en geef de patch de kleur v/d nieuwe state
-  set state (state + 1) mod N
-  set pcolor item state colours
-  set visits visits + 1
+  ifelse (Reverse-walk = false) [
+    set state (state + 1) mod N
+    set pcolor item state colours
+    set visits visits + 1
+  ] [
+    set state (state - 1) mod N
+    set pcolor item state colours
+    set visits visits - 1
+    if (visits = 0) [
+      set pcolor gray
+    ]
+  ]
 end
 
 to heatmap ; Check voor alle patches hoeveel 'visits' ze hebben en bepaal de kleuren van de patches daarop. (Alleen als de app afgelopen is)
@@ -153,8 +192,8 @@ GRAPHICS-WINDOW
 140
 -140
 140
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -201,7 +240,7 @@ CHOOSER
 Sequence-choice
 Sequence-choice
 "Langton's ant" "Still chaos after 1.000.000 steps" "Immediately a simple highway" "A straight highway to the right" "A broad highway, 45 degrees" "568.000 steps before highway emerges" "A highway that is not a multiple of 45 degrees" "A curvy highway to the left" "Some way to fill a sector" "Some other way to fill a sector" "White upper cone filler" "Left lower plane filler" "Some way to fill the whole plane" "Fill the whole plane, connect with highways" "Fill the whole plane, with spiraling highway" "Your brain (from above)" "Your brain (from above), connected to an IC" "Professor's brain (from above)" "Professor's brain connected to an IC" "Complicated construction" "Biffled highway" "Overheating reactor" "Extending square domain" "Persian carpet" "Other carpet (skew)"
-1
+0
 
 INPUTBOX
 5
@@ -308,6 +347,27 @@ NIL
 NIL
 1
 
+SWITCH
+5
+255
+142
+288
+Reverse-walk
+Reverse-walk
+0
+1
+-1000
+
+TEXTBOX
+5
+290
+150
+340
+This button will reverse the ant, but only if the animation is still running.
+11
+0.0
+1
+
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -322,12 +382,13 @@ There are 3 different buttons on top.
 
 ## INPUTS
 
-There are 7 different types of input. 
+There are 8 different types of input. 
 1. First of all there is a list of predefined configurations, which can be selected by the user. 
 2. Secondly there is an input section, where the user can give it's own configuration and length of langton's ant module. It can be 2 to 12 characters long and should consist of R and L (Telling which way the ant has to turn on which state).
 3. Thirth option is to randomly create a configuration, which is also 2 to 12 characters long.
 4. Fourth an fifth options are to determine the angle the ant turns on the left and right move, between 0 to 360 degrees.
 5. Sixth and seventh options are to determine if you want cells in a radius around (0,0) to potentionally have a start value, and the density of the radius created.
+6. Eighth option is reverse-walk, which will 'time-travel' the ant back in time, till t=0. This only works when the animation is still running.
 
 ## WARNING
 
