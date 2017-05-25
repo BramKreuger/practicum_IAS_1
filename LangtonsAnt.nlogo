@@ -1,8 +1,8 @@
 extensions [ table ]
 
 patches-own [ state state-sequence visits ] ; Initialiseer state, state-sequence visits.
-ants-own [ bumped? start? steps] ; Initialiseer bumped? en steps.
-globals [ colours instruction-table N ... ] ; Initialiseer de colours, de instruction table en de N variabele.
+ants-own [ bumped? steps movements ] ; Initialiseer bumped? en steps.
+globals [ colours instruction-table N new-setup ... ] ; Initialiseer de colours, de instruction table, de N en de new-setup variabele.
 
 breed [ants ant]
 to setup
@@ -42,7 +42,7 @@ to setup
    set size 3
    set heading 0
    set bumped? false
-   set start? false
+   set movements []
  ]
  ask patches [
     set state 0 set visits 0 set pcolor gray ; Geef alle patches state 0, visits 0 en maak ze grijs.
@@ -55,6 +55,7 @@ to setup
     set N length state-sequence ; Set the N op de lengte van de state-sequence.
  ]
  starting-values
+ set Reverse-walk false ; Reset reverse walk (backtrack)1
  reset-ticks
 end
 
@@ -107,11 +108,8 @@ to move ; Kijk of de ant een stap vooruit kan, anders set bumped? true.
       back 1
       set steps steps - 1
     ] [
-      if (start? = false) [
-        back 1
-        set heading 0
-        set start? true
-      ]
+      back 1
+      set bumped? true
     ]
   ]
 end
@@ -123,6 +121,9 @@ to direction ; Bepaal de richting aan de hand van de huidige kleur.
     ]
     if(item state state-sequence = "R")[
       right Right-turn-angle
+    ]
+    if (state-sequence = "RL" and Highway-detection = true)[ ; If langton's ant, keep track of the movements
+      cycle-detection
     ]
   ] [
     if(item (state) state-sequence = "L")[
@@ -161,6 +162,51 @@ to heatmap ; Check voor alle patches hoeveel 'visits' ze hebben en bepaal de kle
   ]
 end
 
+to cycle-detection ; Check if there is a highway cycle.
+  set movements lput item state state-sequence movements
+  if length movements > 208 [ ; Remove the first item from the list if it is longer than 208.
+    set movements but-first movements
+    if (check? movements = true) [
+      set bumped? true
+    ]
+  ]
+end
+
+to highway-loop ; This will setup a random enviroment, everytime the animation hits a highway detection.
+  if (new-setup != false) [ ; Only execute the setup when a highway is detected.
+    set Sequence-choice "Langton's ant"
+    set My-sequence-choice ""
+    set radius random 140
+    set density (random 100 / 100)
+    set Left-turn-angle 90
+    set Right-turn-angle 90
+    set Highway-detection true
+    Setup
+    set new-setup false
+  ]
+  if any? ants with [bumped?] [ set new-setup true ] ; Als er een highway is, set setup true.
+  go ; Voer go uit.
+end
+to multiple-ants-highway
+  set Sequence-choice "Fill the whole plane, with spiraling highway"
+  set My-sequence-choice ""
+  set radius 0
+  set density 0
+  set Left-turn-angle 90
+  set Right-turn-angle 90
+  set Reverse-walk false
+  set Highway-detection false
+  Setup
+
+  create-ants 4 [ ; Maak de extra ant's
+   set shape "bug"
+   set color black
+   set size 3
+   set heading 0
+   set bumped? false
+ ]
+end
+
 to random-seq ; Genereer een random sequence van L's en R's en set my sequence choice to deze sequence.
   let random-length 2 + random 10
   let random-sequence to-string n-values random-length [ one-of ["L" "R"] ]
@@ -169,6 +215,18 @@ end
 
 to-report to-string [ l ]  ; Geef de list als string terug.
   report reduce [ [?1 ?2] -> word ?1 ?2 ] l
+end
+
+to-report check? [ list1 ] ; Check if the first 104 moves are the same as the second 104 moves.
+  let i 0
+  while [i < 104] [ ; Check for all 104 items in list.
+    ifelse (item i list1 != item (i + 104) list1) [ ; Check the first item with the 104 item, etc.
+      report false
+    ] [
+      set i i + 1
+    ]
+  ]
+  report true ; Report true if it's the case, thus meaning there is a cycle.
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -192,8 +250,8 @@ GRAPHICS-WINDOW
 140
 -140
 140
-1
-1
+0
+0
 1
 ticks
 30.0
@@ -240,7 +298,7 @@ CHOOSER
 Sequence-choice
 Sequence-choice
 "Langton's ant" "Still chaos after 1.000.000 steps" "Immediately a simple highway" "A straight highway to the right" "A broad highway, 45 degrees" "568.000 steps before highway emerges" "A highway that is not a multiple of 45 degrees" "A curvy highway to the left" "Some way to fill a sector" "Some other way to fill a sector" "White upper cone filler" "Left lower plane filler" "Some way to fill the whole plane" "Fill the whole plane, connect with highways" "Fill the whole plane, with spiraling highway" "Your brain (from above)" "Your brain (from above), connected to an IC" "Professor's brain (from above)" "Professor's brain connected to an IC" "Complicated construction" "Biffled highway" "Overheating reactor" "Extending square domain" "Persian carpet" "Other carpet (skew)"
-0
+14
 
 INPUTBOX
 5
@@ -350,11 +408,11 @@ NIL
 SWITCH
 5
 255
-142
+165
 288
 Reverse-walk
 Reverse-walk
-0
+1
 1
 -1000
 
@@ -368,6 +426,71 @@ This button will reverse the ant, but only if the animation is still running.
 0.0
 1
 
+SWITCH
+170
+255
+330
+288
+Highway-detection
+Highway-detection
+1
+1
+-1000
+
+TEXTBOX
+170
+290
+320
+331
+If you set this ON, it will stop the animation when a highway is detected
+11
+0.0
+1
+
+BUTTON
+75
+395
+247
+428
+Highway detection loop
+highway-loop
+T
+1
+T
+OBSERVER
+NIL
+D
+NIL
+NIL
+1
+
+TEXTBOX
+80
+430
+245
+530
+If you push this button, this will execute a own version of Setup and Go, which will keep restarting when a highway is detected, with random start-values. (Langton's Ant)
+11
+0.0
+1
+
+BUTTON
+50
+350
+292
+383
+Multiple Ants Highway destruction
+multiple-ants-highway 
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -379,6 +502,7 @@ There are 3 different buttons on top.
 1. Setup   -> this button will configure all the changes you made and setup the model.
 2. Go      -> this button wil initialize go function, which starts the model.
 3. Heatmap -> this button will show how many times patches have been visted after a configuration. (Sky is never, others range from a lot white via red to almost none black).
+4. Highway detection loop -> When this button is pressed, its sets a random preset of the map and will execute endless with resetting every time a highway is being constructed.
 
 ## INPUTS
 
@@ -389,6 +513,7 @@ There are 8 different types of input.
 4. Fourth an fifth options are to determine the angle the ant turns on the left and right move, between 0 to 360 degrees.
 5. Sixth and seventh options are to determine if you want cells in a radius around (0,0) to potentionally have a start value, and the density of the radius created.
 6. Eighth option is reverse-walk, which will 'time-travel' the ant back in time, till t=0. This only works when the animation is still running.
+7. Ninth option is highway-detection, which will stop the animation if the ant gets into a 104 cycle. (Only for langton's ant)
 
 ## WARNING
 
